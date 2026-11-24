@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Life RPG</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#f4f1ea;--card:#fff;--ink:#2a2438;--mute:#7a7390;--line:#e3ddf0;--acc:#6d4aff;--gold:#d99a00;--ok:#1f9d63;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15121f;--card:#201b30;--ink:#ece8f8;--mute:#9b94b5;--line:#322b48;--acc:#9a7dff;--gold:#f2b632;--ok:#43d492;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#15121f;--card:#201b30;--ink:#ece8f8;--mute:#9b94b5;--line:#322b48;--acc:#9a7dff;--gold:#f2b632;--ok:#43d492;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.4}
+.wrap{max-width:640px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+h2{font-size:15px;margin:0 0 10px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.hero{display:flex;gap:14px;align-items:center}
+.ava{width:64px;height:64px;border-radius:18px;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:32px;flex:none}
+.hero input{font:inherit;font-weight:700;font-size:18px;background:none;border:none;color:var(--ink);width:100%;padding:0;border-bottom:1px dashed var(--line)}
+.sub{color:var(--mute);font-size:13px}
+.bar{height:10px;background:var(--line);border-radius:99px;overflow:hidden;margin:6px 0}
+.bar i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width .4s}
+.bar.g i{background:var(--gold)}
+.stat{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;margin-bottom:10px}
+.stat b{font-size:14px}
+.q{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.q:first-of-type{border-top:none}
+.q .t{flex:1}
+.q .t div{font-size:12px;color:var(--mute)}
+.chk{width:34px;height:34px;border-radius:10px;border:2px solid var(--acc);background:none;color:#fff;font-size:18px;cursor:pointer;flex:none}
+.q.done .chk{background:var(--ok);border-color:var(--ok)}
+.q.done .t{opacity:.55;text-decoration:line-through}
+.del{background:none;border:none;color:var(--mute);cursor:pointer;font-size:18px}
+form,.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row input,.row select,.row button{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+.row .full{grid-column:1/-1}
+.row button{background:var(--acc);color:#fff;border:none;font-weight:600;cursor:pointer}
+.log{font-size:13px;color:var(--mute);margin:4px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,80px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;transition:transform .3s;font-weight:600;z-index:5;text-align:center}
+.toast.on{transform:translate(-50%,0)}
+.fine{text-align:center;color:var(--mute);font-size:12px}
+.fine button{background:none;border:none;color:var(--mute);text-decoration:underline;cursor:pointer;font:inherit}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card hero">
+    <div class="ava" id="ava">⚔️</div>
+    <div style="flex:1;min-width:0">
+      <input id="name" maxlength="20" aria-label="Имя героя">
+      <div class="sub" id="lvl"></div>
+      <div class="bar g"><i id="xpbar"></i></div>
+      <div class="sub" id="xptxt"></div>
+    </div>
+  </div>
+
+  <div class="card"><h2>Характеристики</h2><div id="stats"></div></div>
+
+  <div class="card">
+    <h2>Квесты на сегодня <span id="streak" style="float:right;color:var(--gold)"></span></h2>
+    <div id="quests"></div>
+  </div>
+
+  <div class="card">
+    <h2>Новый квест</h2>
+    <div class="row">
+      <input id="qt" class="full" maxlength="50" placeholder="Например: 30 минут чтения">
+      <select id="qs"></select>
+      <select id="qx">
+        <option value="10">Лёгкий · 10 XP</option>
+        <option value="25" selected>Средний · 25 XP</option>
+        <option value="50">Сложный · 50 XP</option>
+      </select>
+      <button class="full" id="add">Добавить квест</button>
+    </div>
+  </div>
+
+  <div class="card"><h2>Хроника</h2><div id="log"></div></div>
+  <div class="fine"><button id="reset">Начать заново</button></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var STATS=[
+ {k:'str',n:'Сила',i:'💪'},{k:'int',n:'Интеллект',i:'📚'},{k:'wis',n:'Мудрость',i:'🧘'},
+ {k:'cha',n:'Харизма',i:'🗣️'},{k:'dis',n:'Дисциплина',i:'🛡️'},{k:'cre',n:'Творчество',i:'🎨'}
+];
+var TITLES=['Новичок','Ученик','Искатель','Странник','Воин','Мастер','Герой','Легенда'];
+var KEY='life-rpg-v1';
+function today(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+function yest(){var d=new Date();d.setDate(d.getDate()-1);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+function fresh(){
+ var s={name:'Герой',xp:{},quests:[],log:[],streak:0,lastDay:''};
+ STATS.forEach(function(t){s.xp[t.k]=0});
+ s.quests=[
+  {id:1,t:'Зарядка или тренировка',s:'str',x:25,done:''},
+  {id:2,t:'Читать 20 минут',s:'int',x:25,done:''},
+  {id:3,t:'Медитация 10 минут',s:'wis',x:10,done:''},
+  {id:4,t:'Написать или поговорить с близким',s:'cha',x:10,done:''},
+  {id:5,t:'Сделать то, что откладывал',s:'dis',x:50,done:''},
+  {id:6,t:'Творческая практика',s:'cre',x:25,done:''}
+ ];
+ return s;
+}
+var TG=(window.Telegram&&Telegram.WebApp)||null;
+var S;
+try{var raw=localStorage.getItem(KEY);S=raw?JSON.parse(raw):fresh()}catch(e){S=fresh()}
+if(!S||!S.xp)S=fresh();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+ try{if(TG&&TG.CloudStorage&&TG.isVersionAtLeast('6.9')){var c=JSON.parse(JSON.stringify(S));c.log=c.log.slice(0,3);var j=JSON.stringify(c);if(j.length>4000){c.log=[];j=JSON.stringify(c)}if(j.length<4090)TG.CloudStorage.setItem(KEY,j)}}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+// уровень: для суммы XP берём квадратный корень, чтобы каждый следующий уровень был дороже
+function lvlOf(xp,base){return Math.floor(Math.sqrt(xp/base))+1}
+function need(l,base){return base*l*l}   // XP, нужные для старта уровня l+1
+function total(){var t=0;for(var k in S.xp)t+=S.xp[k];return t}
+function toast(m){var e=document.getElementById('toast');e.textContent=m;e.className='toast on';clearTimeout(toast.t);toast.t=setTimeout(function(){e.className='toast'},2200)}
+function $(i){return document.getElementById(i)}
+
+function render(){
+ var tx=total(),L=lvlOf(tx,60),lo=need(L-1,60),hi=need(L,60);
+ $('name').value=S.name;
+ $('lvl').textContent='Уровень '+L+' · '+TITLES[Math.min(L-1,TITLES.length-1)];
+ $('xpbar').style.width=Math.round((tx-lo)/(hi-lo)*100)+'%';
+ $('xptxt').textContent=(tx-lo)+' / '+(hi-lo)+' XP до следующего уровня';
+ $('streak').textContent=S.streak?'🔥 '+S.streak+' дн.':'';
+ $('stats').innerHTML=STATS.map(function(t){
+  var x=S.xp[t.k]||0,l=lvlOf(x,20),a=need(l-1,20),b=need(l,20);
+  return '<div class="stat"><span>'+t.i+'</span><div><b>'+t.n+'</b><div class="bar"><i style="width:'+Math.round((x-a)/(b-a)*100)+'%"></i></div></div><b>ур. '+l+'</b></div>';
+ }).join('');
+ var td=today();
+ $('quests').innerHTML=S.quests.length?S.quests.map(function(q){
+  var st=STATS.filter(function(t){return t.k===q.s})[0];
+  var d=q.done===td;
+  return '<div class="q'+(d?' done':'')+'"><button class="chk" data-c="'+q.id+'" aria-label="Выполнить">'+(d?'✓':'')+'</button><div class="t">'+esc(q.t)+'<div>'+st.i+' '+st.n+' · +'+q.x+' XP</div></div><button class="del" data-d="'+q.id+'" aria-label="Удалить">×</button></div>';
+ }).join(''):'<div class="sub">Квестов пока нет — добавь первый ниже.</div>';
+ $('log').innerHTML=S.log.length?S.log.slice(0,8).map(function(l){return '<div class="log">'+esc(l)+'</div>'}).join(''):'<div class="sub">Здесь появится история твоих побед.</div>';
+}
+
+function complete(id){
+ var q=S.quests.filter(function(x){return x.id===id})[0],td=today();
+ if(!q||q.done===td)return;
+ var oldL=lvlOf(total(),60),oldS=lvlOf(S.xp[q.s],20);
+ q.done=td;S.xp[q.s]+=q.x;
+ if(S.lastDay!==td){S.streak=(S.lastDay===yest())?S.streak+1:1;S.lastDay=td}
+ var st=STATS.filter(function(t){return t.k===q.s})[0];
+ S.log.unshift(new Date().toLocaleDateString('ru-RU')+' · '+q.t+' (+'+q.x+' XP, '+st.n+')');
+ S.log=S.log.slice(0,30);
+ var m='+'+q.x+' XP · '+st.n;
+ if(lvlOf(total(),60)>oldL)m='🎉 Новый уровень героя: '+lvlOf(total(),60)+'!';
+ else if(lvlOf(S.xp[q.s],20)>oldS)m='⬆️ '+st.n+' выросла до уровня '+lvlOf(S.xp[q.s],20)+'!';
+ save();render();toast(m);try{if(TG)TG.HapticFeedback.notificationOccurred('success')}catch(e){}
+}
+
+$('quests').addEventListener('click',function(e){
+ var c=e.target.getAttribute('data-c'),d=e.target.getAttribute('data-d');
+ if(c)complete(+c);
+ if(d){S.quests=S.quests.filter(function(q){return q.id!==+d});save();render()}
+});
+$('name').addEventListener('change',function(){S.name=this.value.trim()||'Герой';save()});
+$('qs').innerHTML=STATS.map(function(t){return '<option value="'+t.k+'">'+t.i+' '+t.n+'</option>'}).join('');
+$('add').addEventListener('click',function(){
+ var t=$('qt').value.trim();if(!t)return;
+ S.quests.push({id:Date.now(),t:t,s:$('qs').value,x:+$('qx').value,done:''});
+ $('qt').value='';save();render();
+});
+$('reset').addEventListener('click',function(){
+ function go(){S=fresh();save();render()}
+ if(TG&&TG.showConfirm)TG.showConfirm('Стереть весь прогресс и начать заново?',function(ok){if(ok)go()});
+ else if(confirm('Стереть весь прогресс и начать заново?'))go();
+});
+render();
+if(TG){try{
+ TG.ready();TG.expand();
+ var tp=TG.themeParams||{},r=document.documentElement;
+ r.setAttribute('data-theme',TG.colorScheme==='dark'?'dark':'light');
+ if(tp.bg_color){r.style.setProperty('--bg',tp.bg_color);r.style.setProperty('--card',tp.secondary_bg_color||tp.bg_color);r.style.setProperty('--ink',tp.text_color);r.style.setProperty('--mute',tp.hint_color);r.style.setProperty('--acc',tp.button_color)}
+ if(TG.isVersionAtLeast('6.9')&&TG.CloudStorage){
+  TG.CloudStorage.getItem(KEY,function(err,v){
+   try{if(!err&&v){var c=JSON.parse(v);if(c&&c.xp){var ct=0;for(var k in c.xp)ct+=c.xp[k];if(ct>total()){c.log=c.log||[];S=c;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}render()}}}}catch(e){}
+  });
+ }
+}catch(e){}}
+</script>
+</body>
+</html>
